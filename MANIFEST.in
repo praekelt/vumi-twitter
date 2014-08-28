@@ -3,7 +3,7 @@ include .coveragerc
 include AUTHORS
 include CONTRIBUTING.rst
 include LICENSE
-include README.rst
+include README.md
 include requirements.txt
 include setup.py
 
