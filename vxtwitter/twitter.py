@@ -52,6 +52,15 @@ class TwitterTransportConfig(Transport.CONFIG_CLASS):
         "Determines whether the transport will follow users that follow the "
         "transport's user",
         default=False, static=True)
+    autoresponse = ConfigBool(
+        "Determines whether the transport will send an automatic reply to the "
+        "user that follows the transport",
+        default=False, static=True
+    )
+    autoresponse_type = ConfigText(
+        "Determines whether the transport autoresponse will be sent as a "
+        "tweet or a dm", static=True
+    )
 
 
 class TwitterTransport(Transport):
@@ -75,6 +84,8 @@ class TwitterTransport(Transport):
         self.screen_name = config.screen_name
 
         self.autofollow = config.autofollow
+        self.autoresponse = config.autoresponse
+        self.autoresponse_type = config.autoresponse_type
 
         self.client = self.get_client(
             config.access_token,
@@ -166,6 +177,7 @@ class TwitterTransport(Transport):
         user = messagetools.tweet_user(tweet)
         return cls.screen_name_as_addr(messagetools.user_screen_name(user))
 
+
     @classmethod
     def tweet_content(cls, tweet):
         to_addr = cls.tweet_to_addr(tweet)
@@ -175,6 +187,19 @@ class TwitterTransport(Transport):
             content = content[len(to_addr):].lstrip()
 
         return content
+
+    @classmethod
+    def follow_addr(cls, follow):
+        user = follow.get('target')
+        return cls.screen_name_as_addr(messagetools.user_screen_name(user))
+
+    @classmethod
+    def follow_from_addr(cls, follow):
+        user = follow.get('source')
+        return cls.screen_name_as_addr(messagetools.user_screen_name(user))
+
+    def get_default_endpoint(self):
+        self.endpoints['tweets']
 
     def publish_tweet(self, tweet):
         return self.publish_message(
@@ -219,6 +244,18 @@ class TwitterTransport(Transport):
                 }
             })
 
+    def publish_null_message(self, message):
+        log.msg("Publish null message to vumi")
+        return self.publish_message(
+            content=None,
+            to_addr=self.follow_addr(message),
+            from_addr=self.follow_from_addr(message),
+            transport_type=self.transport_type,
+            routing_metadata={
+                'endpoint_name': self.endpoints[self.autoresponse_type]
+            },
+        )
+
     def handle_track_stream(self, message):
         if messagetools.is_tweet(message):
             if self.is_own_tweet(message):
@@ -247,12 +284,21 @@ class TwitterTransport(Transport):
             return
 
         log.msg("Received follow on user stream: %r" % (follow,))
+        resp = None
 
         if self.autofollow:
             screen_name = messagetools.user_screen_name(follow['source'])
             log.msg("Auto-following '%s'" %
                     (self.screen_name_as_addr(screen_name,)))
-            return self.client.friendships_create(screen_name=screen_name)
+            resp = self.client.friendships_create(screen_name=screen_name)
+
+        if self.autoresponse:
+            screen_name = messagetools.user_screen_name(follow['source'])
+            log.msg("Send null message to vumi for auto-follow '%s'" %
+                    (self.screen_name_as_addr(screen_name,)))
+            resp = self.publish_null_message(follow)
+
+        return resp
 
     def handle_inbound_dm(self, dm):
         if self.is_own_dm(dm):
