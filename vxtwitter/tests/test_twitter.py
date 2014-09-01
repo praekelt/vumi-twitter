@@ -1,14 +1,12 @@
 from twisted.internet.defer import inlineCallbacks
 from txtwitter.tests.fake_twitter import FakeTwitter
-
 from vumi.tests.utils import LogCatcher
 from vumi.tests.helpers import VumiTestCase
 from vumi.config import Config
 from vumi.errors import ConfigError
-from vumi.transports.twitter import (
-    ConfigTwitterEndpoints, TwitterTransport)
 from vumi.transports.tests.helpers import TransportHelper
-
+from vxtwitter.twitter import (
+    ConfigTwitterEndpoints, TwitterTransport)
 
 class TestTwitterEndpointsConfig(VumiTestCase):
     def test_clean_no_endpoints(self):
@@ -296,6 +294,74 @@ class TestTwitterTransport(VumiTestCase):
 
         follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
         self.assertTrue(follow is None)
+
+    @inlineCallbacks
+    def test_auto_response_tweet(self):
+        self.config['autoresponse'] = True
+        self.config['autoresponse_type'] = 'tweets'
+        yield self.tx_helper.get_transport(self.config)
+
+        with LogCatcher() as lc:
+            someone = self.twitter.new_user('someone', 'someone')
+            self.twitter.add_follow(someone.id_str, self.user.id_str)
+            self.assertTrue(any(
+                "Publish null message to vumi" in msg
+                for msg in lc.messages()))
+            self.assertTrue(any(
+                "Send null message to vumi for auto-follow '@someone'" in msg
+                for msg in lc.messages()))
+
+        #Assert that following is not happening
+        follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
+        self.assertTrue(follow is None)
+
+    @inlineCallbacks
+    def test_auto_response_dm(self):
+        self.config['autoresponse'] = True
+        self.config['autoresponse_type'] = 'dms'
+        yield self.tx_helper.get_transport(self.config)
+
+        with LogCatcher() as lc:
+            someone = self.twitter.new_user('someone', 'someone')
+            self.twitter.add_follow(someone.id_str, self.user.id_str)
+
+            self.assertTrue(any(
+                "Publish null message to vumi" in msg
+                for msg in lc.messages()))
+
+            self.assertTrue(any(
+                "Send null message to vumi for auto-follow '@someone'" in msg
+                for msg in lc.messages()))
+
+
+        #Assert that following is not happening
+        follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
+        self.assertTrue(follow is None)
+
+    @inlineCallbacks
+    def test_auto_response_auto_follow_enabled(self):
+        self.config['autoresponse'] = True
+        self.config['autofollow'] = True
+        self.config['autoresponse_type'] = 'tweets'
+        yield self.tx_helper.get_transport(self.config)
+
+        with LogCatcher() as lc:
+            someone = self.twitter.new_user('someone', 'someone')
+            self.twitter.add_follow(someone.id_str, self.user.id_str)
+            self.assertTrue(any(
+                "Received follow on user stream" in msg
+                for msg in lc.messages()))
+            self.assertTrue(any(
+                "Publish null message to vumi" in msg
+                for msg in lc.messages()))
+            self.assertTrue(any(
+                "Send null message to vumi for auto-follow '@someone'" in msg
+                for msg in lc.messages()))
+
+        #Assert that following is not happening
+        follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
+        self.assertTrue(follow is not None)
+
 
     def test_inbound_own_follow(self):
         with LogCatcher() as lc:
