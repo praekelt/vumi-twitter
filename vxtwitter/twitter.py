@@ -177,7 +177,6 @@ class TwitterTransport(Transport):
         user = messagetools.tweet_user(tweet)
         return cls.screen_name_as_addr(messagetools.user_screen_name(user))
 
-
     @classmethod
     def tweet_content(cls, tweet):
         to_addr = cls.tweet_to_addr(tweet)
@@ -199,7 +198,7 @@ class TwitterTransport(Transport):
         return cls.screen_name_as_addr(messagetools.user_screen_name(user))
 
     def get_default_endpoint(self):
-        self.endpoints['tweets']
+        return self.endpoints['tweets']
 
     def publish_tweet(self, tweet):
         return self.publish_message(
