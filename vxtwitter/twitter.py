@@ -289,6 +289,7 @@ class TwitterTransport(Transport):
             screen_name = messagetools.user_screen_name(follow['source'])
             log.msg("Auto-following '%s'" %
                     (self.screen_name_as_addr(screen_name,)))
+
             resp = self.client.friendships_create(screen_name=screen_name)
 
         if self.autoresponse:

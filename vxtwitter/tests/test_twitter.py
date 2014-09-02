@@ -8,6 +8,7 @@ from vumi.transports.tests.helpers import TransportHelper
 from vxtwitter.twitter import (
     ConfigTwitterEndpoints, TwitterTransport)
 
+
 class TestTwitterEndpointsConfig(VumiTestCase):
     def test_clean_no_endpoints(self):
         class ToyConfig(Config):
