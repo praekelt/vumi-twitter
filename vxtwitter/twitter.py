@@ -58,8 +58,8 @@ class TwitterTransportConfig(Transport.CONFIG_CLASS):
         default=False, static=True
     )
     autoresponse_type = ConfigText(
-        "Determines whether the transport autoresponse will be sent as a "
-        "tweet or a dm", static=True
+        "Determines which endpoint the transport autoresponse will be sent "
+        "with", static=True
     )
 
 
@@ -277,28 +277,27 @@ class TwitterTransport(Transport):
             "Received a user stream message that we do not handle: %r" %
             message)
 
+    @inlineCallbacks
     def handle_follow(self, follow):
         if self.is_own_follow(follow):
             log.msg("Received own follow on user stream: %r" % (follow,))
             return
 
         log.msg("Received follow on user stream: %r" % (follow,))
-        resp = None
 
         if self.autofollow:
             screen_name = messagetools.user_screen_name(follow['source'])
             log.msg("Auto-following '%s'" %
                     (self.screen_name_as_addr(screen_name,)))
 
-            resp = self.client.friendships_create(screen_name=screen_name)
+            yield self.client.friendships_create(screen_name=screen_name)
 
         if self.autoresponse:
             screen_name = messagetools.user_screen_name(follow['source'])
             log.msg("Send null message to vumi for auto-follow '%s'" %
                     (self.screen_name_as_addr(screen_name,)))
-            resp = self.publish_null_message(follow)
+            yield self.publish_null_message(follow)
 
-        return resp
 
     def handle_inbound_dm(self, dm):
         if self.is_own_dm(dm):
