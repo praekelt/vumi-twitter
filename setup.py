@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="vxtwitter",
-    version="0.1.0a",
+    version="0.1.1a",
     url='http://github.com/praekelt/vumi-twitter',
     license='BSD',
     description="A Twitter transport for Vumi.",
