@@ -1,6 +1,5 @@
 from twisted.internet.defer import inlineCallbacks
 from txtwitter.tests.fake_twitter import FakeTwitter
-
 from vumi.tests.utils import LogCatcher
 from vumi.tests.helpers import VumiTestCase
 from vumi.config import Config
@@ -296,6 +295,103 @@ class TestTwitterTransport(VumiTestCase):
 
         follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
         self.assertTrue(follow is None)
+
+    @inlineCallbacks
+    def test_auto_response_tweet(self):
+        self.config['autoresponse'] = True
+        self.config['autoresponse_type'] = 'tweets'
+        yield self.tx_helper.get_transport(self.config)
+
+        with LogCatcher() as lc:
+            someone = self.twitter.new_user('someone', 'someone')
+            self.twitter.add_follow(someone.id_str, self.user.id_str)
+
+            # Assert that message has been published
+            [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+            self.assertEqual(msg['from_addr'], '@someone')
+            self.assertEqual(msg['to_addr'], '@me')
+            self.assertEqual(msg['content'], None)
+            self.assertEqual(msg.get_routing_endpoint(), 'tweet_endpoint')
+            self.assertEqual(msg['in_reply_to'], None)
+
+            self.assertTrue(any(
+                "Publish null message to vumi" in msg
+                for msg in lc.messages()))
+            self.assertTrue(any(
+                "Send null message to vumi for auto-follow '@someone'" in msg
+                for msg in lc.messages()))
+
+        # Assert that following is not happening
+        follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
+        self.assertTrue(follow is None)
+
+    @inlineCallbacks
+    def test_auto_response_dm(self):
+        self.config['autoresponse'] = True
+        self.config['autoresponse_type'] = 'dms'
+        yield self.tx_helper.get_transport(self.config)
+
+        with LogCatcher() as lc:
+            someone = self.twitter.new_user('someone', 'someone')
+            self.twitter.add_follow(someone.id_str, self.user.id_str)
+
+            # Assert that message has been published
+            [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+            self.assertEqual(msg['from_addr'], '@someone')
+            self.assertEqual(msg['to_addr'], '@me')
+            self.assertEqual(msg['content'], None)
+            self.assertEqual(msg.get_routing_endpoint(), 'dm_endpoint')
+            self.assertEqual(msg['in_reply_to'], None)
+
+            self.assertTrue(any(
+                "Publish null message to vumi" in msg
+                for msg in lc.messages()))
+
+            self.assertTrue(any(
+                "Send null message to vumi for auto-follow '@someone'" in msg
+                for msg in lc.messages()))
+
+        #Assert that following is not happening
+        follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
+        self.assertTrue(follow is None)
+
+    @inlineCallbacks
+    def test_auto_response_auto_follow_enabled(self):
+        self.config['autoresponse'] = True
+        self.config['autofollow'] = True
+        self.config['autoresponse_type'] = 'tweets'
+        yield self.tx_helper.get_transport(self.config)
+
+        with LogCatcher() as lc:
+            someone = self.twitter.new_user('someone', 'someone')
+            self.twitter.add_follow(someone.id_str, self.user.id_str)
+
+            # Assert that message has been published
+            [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+            self.assertEqual(msg['from_addr'], '@someone')
+            self.assertEqual(msg['to_addr'], '@me')
+            self.assertEqual(msg['content'], None)
+            self.assertEqual(msg.get_routing_endpoint(), 'tweet_endpoint')
+            self.assertEqual(msg['in_reply_to'], None)
+
+            # Check log messages
+            self.assertTrue(any(
+                "Received follow on user stream" in msg
+                for msg in lc.messages()))
+            self.assertTrue(any(
+                "Publish null message to vumi" in msg
+                for msg in lc.messages()))
+            self.assertTrue(any(
+                "Send null message to vumi for auto-follow '@someone'" in msg
+                for msg in lc.messages()))
+
+        #Assert that following is happening
+        follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
+        self.assertTrue(follow is not None)
+
 
     def test_inbound_own_follow(self):
         with LogCatcher() as lc:
