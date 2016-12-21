@@ -1,6 +1,6 @@
 # -*- test-case-name: vumi.transports.twitter.tests.test_twitter -*-
 from twisted.python import log
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, returnValue
 from txtwitter.twitter import TwitterClient
 from txtwitter import messagetools
 
@@ -298,7 +298,6 @@ class TwitterTransport(Transport):
                     (self.screen_name_as_addr(screen_name,)))
             yield self.publish_null_message(follow)
 
-
     def handle_inbound_dm(self, dm):
         if self.is_own_dm(dm):
             log.msg("Received own DM on user stream: %r" % (dm,))
@@ -329,10 +328,12 @@ class TwitterTransport(Transport):
     def handle_outbound_tweet(self, message):
         log.msg("Twitter transport sending tweet %r" % (message,))
 
-        transport_metadata = message['transport_metadata'].get(self.transport_type, {})
+        transport_metadata = message['transport_metadata'].get(
+            self.transport_type, {})
         in_reply_to_status_id = transport_metadata.get('status_id')
 
-        helper_metadata = message['helper_metadata'].get(self.transport_type, {})
+        helper_metadata = message['helper_metadata'].get(
+            self.transport_type, {})
         media = helper_metadata.get('media', [])
         media_ids = []
         for image in media:
@@ -342,8 +343,9 @@ class TwitterTransport(Transport):
         if message['to_addr'] != self.NO_USER_ADDR:
             content = "%s %s" % (message['to_addr'], content)
 
-        return self.client.statuses_update(content,
-            in_reply_to_status_id=in_reply_to_status_id, media_ids=media_ids)
+        return self.client.statuses_update(
+            content, in_reply_to_status_id=in_reply_to_status_id,
+            media_ids=media_ids)
 
     @inlineCallbacks
     def upload_media_and_get_id(self, image):
@@ -353,4 +355,4 @@ class TwitterTransport(Transport):
             res = yield self.client.upload_media(media=f)
             content = yield res.json()
             media_id = content.get('media_id_string', '')
-        return media_id
+        returnValue(media_id)

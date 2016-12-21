@@ -353,7 +353,7 @@ class TestTwitterTransport(VumiTestCase):
                 "Send null message to vumi for auto-follow '@someone'" in msg
                 for msg in lc.messages()))
 
-        #Assert that following is not happening
+        # Assert that following is not happening
         follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
         self.assertTrue(follow is None)
 
@@ -388,10 +388,9 @@ class TestTwitterTransport(VumiTestCase):
                 "Send null message to vumi for auto-follow '@someone'" in msg
                 for msg in lc.messages()))
 
-        #Assert that following is happening
+        # Assert that following is happening
         follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
         self.assertTrue(follow is not None)
-
 
     def test_inbound_own_follow(self):
         with LogCatcher() as lc:
