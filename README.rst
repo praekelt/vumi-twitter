@@ -30,7 +30,7 @@ The best way to run the transport is by making use of Junebug_, which allows you
 
     $ sudo apt-get install redis-server rabbitmq-server
     $ pip install junebug
-    $ pip install vxtelegram
+    $ pip install vxtwitter
 
 You should have both Redis and RabbitMQ running to start the transport::
 
@@ -40,7 +40,7 @@ You should have both Redis and RabbitMQ running to start the transport::
 Launch Junebug with the Twitter channel configured::
 
     $ jb -p 8080 \
-    $   --channels telegram:vxtwitter.twitter.TwitterTransport \
+    $   --channels twitter:vxtwitter.twitter.TwitterTransport \
     $   --logging-path logs
 
 .. note::
