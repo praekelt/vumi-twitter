@@ -76,6 +76,10 @@ class TwitterTransport(Transport):
         'dms': 'handle_outbound_dm',
     }
 
+    @classmethod
+    def open_file(cls, file_name, mode):
+        return open(file_name, mode)
+
     def get_client(self, *a, **kw):
         return TwitterClient(*a, **kw)
 
@@ -325,6 +329,7 @@ class TwitterTransport(Transport):
             screen_name=self.addr_as_screen_name(message['to_addr']),
             text=message['content'])
 
+    @inlineCallbacks
     def handle_outbound_tweet(self, message):
         log.msg("Twitter transport sending tweet %r" % (message,))
 
@@ -337,22 +342,26 @@ class TwitterTransport(Transport):
         media = helper_metadata.get('media', [])
         media_ids = []
         for image in media:
-            media_ids.append(self.upload_media_and_get_id(image))
+            media_id = yield self.upload_media_and_get_id(image)
+            media_ids.append(media_id)
 
         content = message['content']
         if message['to_addr'] != self.NO_USER_ADDR:
             content = "%s %s" % (message['to_addr'], content)
 
-        return self.client.statuses_update(
+        tweet = yield self.client.statuses_update(
             content, in_reply_to_status_id=in_reply_to_status_id,
             media_ids=media_ids)
+        returnValue(tweet)
 
     @inlineCallbacks
     def upload_media_and_get_id(self, image):
         file_path = image.get('file_path')
         media_id = ''
-        with open(file_path, 'rb') as f:
-            res = yield self.client.upload_media(media=f)
-            content = yield res.json()
-            media_id = content.get('media_id_string', '')
-        returnValue(media_id)
+        f = self.open_file(self, file_path, 'rb')
+        try:
+            res = yield self.client.media_upload(media=f)
+            media_id = res.get('media_id_str', '')
+        finally:
+            f.close()
+            returnValue(media_id)
