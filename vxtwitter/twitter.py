@@ -358,7 +358,7 @@ class TwitterTransport(Transport):
     def upload_media_and_get_id(self, image):
         file_path = image.get('file_path')
         media_id = ''
-        f = self.open_file(self, file_path, 'rb')
+        f = self.open_file(file_path, 'rb')
         try:
             res = yield self.client.media_upload(media=f)
             media_id = res.get('media_id_str', '')

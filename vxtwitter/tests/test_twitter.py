@@ -9,7 +9,7 @@ from vxtwitter.twitter import (
     ConfigTwitterEndpoints, TwitterTransport)
 
 
-def open_fake_file(cls, file_path, mode):
+def open_fake_file(file_path, mode):
     return FakeImage(file_path, 'contents')
 
 
