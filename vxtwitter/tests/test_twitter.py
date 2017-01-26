@@ -445,14 +445,14 @@ class TestTwitterTransport(VumiTestCase):
 
         tweet = self.twitter.get_tweet(ack['sent_message_id'])
         tweet_dict = tweet.to_dict(self.twitter)
-        media_id = tweet_dict.get('media_ids')[0]
+        media_id = tweet_dict.get('media_ids').split(',')[0]
         media = self.twitter.get_media(media_id)
         expected_media = FakeMedia(expected_id, FakeImage('image', 'contents'))
 
         self.assertEqual(
             media.to_dict(self.twitter), expected_media.to_dict(self.twitter))
         self.assertEqual(tweet_dict['text'], '@someone hello')
-        self.assertEqual(tweet_dict['media_ids'], [expected_id])
+        self.assertEqual(tweet_dict['media_ids'].rstrip(','), expected_id)
 
     @inlineCallbacks
     def test_tweet_with_multiple_images(self):
@@ -467,9 +467,9 @@ class TestTwitterTransport(VumiTestCase):
 
         tweet = self.twitter.get_tweet(ack['sent_message_id'])
         tweet_dict = tweet.to_dict(self.twitter)
-        media_ids = tweet_dict['media_ids']
+        media_ids = tweet_dict['media_ids'].rstrip(',')
 
-        self.assertEqual(len(media_ids), 2)
+        self.assertEqual(len(media_ids.split(',')), 2)
         for expected_id in self.twitter.media.keys():
             self.assertIn(expected_id, media_ids)
 
