@@ -427,7 +427,8 @@ class TestTwitterTransport(VumiTestCase):
             {'file_path': 'image'})
 
         media = self.twitter.get_media(media_id)
-        expected_media = FakeMedia(media_id, FakeImage('image', 'contents'))
+        expected_media = FakeMedia(media_id, FakeImage('image', 'contents'),
+                                   additional_owners={})
         self.assertEqual(
             media.to_dict(self.twitter), expected_media.to_dict(self.twitter))
 
@@ -447,7 +448,8 @@ class TestTwitterTransport(VumiTestCase):
         tweet_dict = tweet.to_dict(self.twitter)
         media_id = tweet_dict.get('media_ids').split(',')[0]
         media = self.twitter.get_media(media_id)
-        expected_media = FakeMedia(expected_id, FakeImage('image', 'contents'))
+        expected_media = FakeMedia(expected_id, FakeImage('image', 'contents'),
+                                   additional_owners={})
 
         self.assertEqual(
             media.to_dict(self.twitter), expected_media.to_dict(self.twitter))
