@@ -6,7 +6,7 @@ setup(
     url='http://github.com/praekelt/vumi-twitter',
     license='BSD',
     description="A Twitter transport for Vumi.",
-    long_description=open('README.md', 'r').read(),
+    long_description=open('README.rst', 'r').read(),
     author='Praekelt Foundation',
     author_email='dev@praekeltfoundation.org',
     packages=find_packages(),
