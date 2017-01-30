@@ -1,5 +1,5 @@
 from twisted.internet.defer import inlineCallbacks
-from txtwitter.tests.fake_twitter import FakeTwitter
+from txtwitter.tests.fake_twitter import FakeTwitter, FakeImage, FakeMedia
 from vumi.tests.utils import LogCatcher
 from vumi.tests.helpers import VumiTestCase
 from vumi.config import Config
@@ -7,6 +7,10 @@ from vumi.errors import ConfigError
 from vumi.transports.tests.helpers import TransportHelper
 from vxtwitter.twitter import (
     ConfigTwitterEndpoints, TwitterTransport)
+
+
+def open_fake_file(file_path, mode):
+    return FakeImage(file_path, 'contents')
 
 
 class TestTwitterEndpointsConfig(VumiTestCase):
@@ -52,6 +56,9 @@ class TestTwitterTransport(VumiTestCase):
         }
 
         self.transport = yield self.tx_helper.get_transport(self.config)
+
+        self.transport.open_file = open_fake_file
+        FakeImage.close = lambda _: None
 
     def test_config_endpoints_default(self):
         del self.config['endpoints']
@@ -353,7 +360,7 @@ class TestTwitterTransport(VumiTestCase):
                 "Send null message to vumi for auto-follow '@someone'" in msg
                 for msg in lc.messages()))
 
-        #Assert that following is not happening
+        # Assert that following is not happening
         follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
         self.assertTrue(follow is None)
 
@@ -388,10 +395,9 @@ class TestTwitterTransport(VumiTestCase):
                 "Send null message to vumi for auto-follow '@someone'" in msg
                 for msg in lc.messages()))
 
-        #Assert that following is happening
+        # Assert that following is happening
         follow = self.twitter.get_follow(self.user.id_str, someone.id_str)
         self.assertTrue(follow is not None)
-
 
     def test_inbound_own_follow(self):
         with LogCatcher() as lc:
@@ -414,6 +420,60 @@ class TestTwitterTransport(VumiTestCase):
         tweet = self.twitter.get_tweet(ack['sent_message_id'])
         self.assertEqual(tweet.text, '@someone hello')
         self.assertEqual(tweet.reply_to, None)
+
+    @inlineCallbacks
+    def test_upload_media(self):
+        media_id = yield self.transport.upload_media_and_get_id(
+            {'file_path': 'image'})
+
+        media = self.twitter.get_media(media_id)
+        expected_media = FakeMedia(media_id, FakeImage('image', 'contents'),
+                                   additional_owners={})
+        self.assertEqual(
+            media.to_dict(self.twitter), expected_media.to_dict(self.twitter))
+
+    @inlineCallbacks
+    def test_tweet_with_embedded_media(self):
+        expected_id = str(self.twitter._next_media_id)
+        self.twitter.new_user('someone', 'someone')
+        msg = yield self.tx_helper.make_dispatch_outbound(
+            'hello', to_addr='@someone', endpoint='tweet_endpoint',
+            helper_metadata={'twitter': {
+                'media': [{'file_path': 'image'}],
+            }})
+        [ack] = yield self.tx_helper.wait_for_dispatched_events(1)
+        self.assertEqual(ack['user_message_id'], msg['message_id'])
+
+        tweet = self.twitter.get_tweet(ack['sent_message_id'])
+        tweet_dict = tweet.to_dict(self.twitter)
+        media_id = tweet_dict.get('media_ids').split(',')[0]
+        media = self.twitter.get_media(media_id)
+        expected_media = FakeMedia(expected_id, FakeImage('image', 'contents'),
+                                   additional_owners={})
+
+        self.assertEqual(
+            media.to_dict(self.twitter), expected_media.to_dict(self.twitter))
+        self.assertEqual(tweet_dict['text'], '@someone hello')
+        self.assertEqual(tweet_dict['media_ids'].rstrip(','), expected_id)
+
+    @inlineCallbacks
+    def test_tweet_with_multiple_images(self):
+        self.twitter.new_user('someone', 'someone')
+        msg = yield self.tx_helper.make_dispatch_outbound(
+            'hello', to_addr='@someone', endpoint='tweet_endpoint',
+            helper_metadata={'twitter': {
+                'media': [{'file_path': 'img1'}, {'file_path': 'img2'}],
+            }})
+        [ack] = yield self.tx_helper.wait_for_dispatched_events(1)
+        self.assertEqual(ack['user_message_id'], msg['message_id'])
+
+        tweet = self.twitter.get_tweet(ack['sent_message_id'])
+        tweet_dict = tweet.to_dict(self.twitter)
+        media_ids = tweet_dict['media_ids'].rstrip(',')
+
+        self.assertEqual(len(media_ids.split(',')), 2)
+        for expected_id in self.twitter.media.keys():
+            self.assertIn(expected_id, media_ids)
 
     @inlineCallbacks
     def test_tweet_reply_sending(self):

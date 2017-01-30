@@ -1,6 +1,6 @@
 # -*- test-case-name: vumi.transports.twitter.tests.test_twitter -*-
 from twisted.python import log
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, returnValue
 from txtwitter.twitter import TwitterClient
 from txtwitter import messagetools
 
@@ -75,6 +75,10 @@ class TwitterTransport(Transport):
         'tweets': 'handle_outbound_tweet',
         'dms': 'handle_outbound_dm',
     }
+
+    @classmethod
+    def open_file(cls, file_name, mode):
+        return open(file_name, mode)
 
     def get_client(self, *a, **kw):
         return TwitterClient(*a, **kw)
@@ -298,7 +302,6 @@ class TwitterTransport(Transport):
                     (self.screen_name_as_addr(screen_name,)))
             yield self.publish_null_message(follow)
 
-
     def handle_inbound_dm(self, dm):
         if self.is_own_dm(dm):
             log.msg("Received own DM on user stream: %r" % (dm,))
@@ -326,15 +329,39 @@ class TwitterTransport(Transport):
             screen_name=self.addr_as_screen_name(message['to_addr']),
             text=message['content'])
 
+    @inlineCallbacks
     def handle_outbound_tweet(self, message):
         log.msg("Twitter transport sending tweet %r" % (message,))
 
-        metadata = message['transport_metadata'].get(self.transport_type, {})
-        in_reply_to_status_id = metadata.get('status_id')
+        transport_metadata = message['transport_metadata'].get(
+            self.transport_type, {})
+        in_reply_to_status_id = transport_metadata.get('status_id')
+
+        helper_metadata = message['helper_metadata'].get(
+            self.transport_type, {})
+        media = helper_metadata.get('media', [])
+        media_ids = []
+        for image in media:
+            media_id = yield self.upload_media_and_get_id(image)
+            media_ids.append(media_id)
 
         content = message['content']
         if message['to_addr'] != self.NO_USER_ADDR:
             content = "%s %s" % (message['to_addr'], content)
 
-        return self.client.statuses_update(
-            content, in_reply_to_status_id=in_reply_to_status_id)
+        tweet = yield self.client.statuses_update(
+            content, in_reply_to_status_id=in_reply_to_status_id,
+            media_ids=media_ids)
+        returnValue(tweet)
+
+    @inlineCallbacks
+    def upload_media_and_get_id(self, image):
+        file_path = image.get('file_path')
+        media_id = ''
+        f = self.open_file(file_path, 'rb')
+        try:
+            res = yield self.client.media_upload(media=f)
+            media_id = res.get('media_id_str', '')
+        finally:
+            f.close()
+            returnValue(media_id)
